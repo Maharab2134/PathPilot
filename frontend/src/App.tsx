@@ -14,6 +14,9 @@ import { History } from '@/pages/History';
 import { Leaderboard } from '@/pages/Leaderboard';
 import { About } from '@/pages/About';
 import { Contact } from '@/pages/Contact';
+import { HelpCenter } from '@/pages/HelpCenter';
+import { PrivacyPolicy } from '@/pages/PrivacyPolicy';
+import { TermsOfService } from '@/pages/TermsOfService';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AdminRoute } from '@/components/auth/AdminRoute';
 import { AdminDashboard } from '@/pages/admin/AdminDashboard';
@@ -39,6 +42,9 @@ function App() {
                 <Route path="/leaderboard" element={<Leaderboard />} />
                 <Route path="/about" element={<About />} />
                 <Route path="/contact" element={<Contact />} />
+                <Route path="/help" element={<HelpCenter />} />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
+                <Route path="/terms" element={<TermsOfService />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                  <Route path="/admin" element={
