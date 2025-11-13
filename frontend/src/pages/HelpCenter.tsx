@@ -16,7 +16,6 @@ import {
   BookOpen,
   Users,
   Shield,
-  CreditCard,
   Smartphone,
   Zap,
   CheckCircle,

@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { 
   ArrowRight, 
-  Brain, 
+  Search,
   Target, 
   TrendingUp, 
   Users,
@@ -24,7 +24,9 @@ import {
   GraduationCap,
   Lightbulb,
   BarChart3,
-  Heart
+  Heart,
+  FileText,
+  Compass
 } from 'lucide-react';
 
 export const Home: React.FC = () => {
@@ -32,9 +34,9 @@ export const Home: React.FC = () => {
 
   const features = [
     {
-      icon: Brain,
-      title: 'AI-Powered Assessment',
-      description: 'Advanced algorithms analyze your skills and interests to provide accurate career recommendations.',
+      icon: Search,
+      title: 'Smart Career Assessment',
+      description: 'Comprehensive quizzes and personality tests to discover careers that match your unique strengths and interests.',
       color: 'from-purple-500 to-pink-500',
       iconColor: 'text-purple-600'
     },
@@ -54,8 +56,8 @@ export const Home: React.FC = () => {
     },
     {
       icon: Users,
-      title: 'Smart Community',
-      description: 'Connect with peers and mentors in your chosen career field for guidance.',
+      title: 'Expert Community',
+      description: 'Connect with career coaches and mentors in your chosen field for personalized guidance.',
       color: 'from-orange-500 to-red-500',
       iconColor: 'text-orange-600'
     }
@@ -65,28 +67,28 @@ export const Home: React.FC = () => {
     { number: '50K+', label: 'Career Discoveries', icon: Rocket, change: '+25% this month' },
     { number: '95%', label: 'User Satisfaction', icon: Star, change: 'Rated 4.8+ stars' },
     { number: '200+', label: 'Career Paths', icon: BookOpen, change: 'Constantly growing' },
-    { number: '24/7', label: 'AI Support', icon: Shield, change: 'Always available' }
+    { number: '100+', label: 'Career Experts', icon: Users, change: 'Professional guidance' }
   ];
 
   const testimonials = [
     {
       name: 'Sarah Chen',
       role: 'Software Developer',
-      content: 'PathPilot helped me transition from marketing to tech. The personalized learning path was exactly what I needed!',
+      content: 'The career assessment helped me transition from marketing to tech. The personalized learning path was exactly what I needed!',
       avatar: 'SC',
       rating: 5
     },
     {
       name: 'Marcus Johnson',
       role: 'Data Scientist',
-      content: 'The career assessment pinpointed my strengths perfectly. I found my dream job in just 3 months!',
+      content: 'The career quizzes pinpointed my strengths perfectly. I found my dream job in just 3 months!',
       avatar: 'MJ',
       rating: 5
     },
     {
       name: 'Elena Rodriguez',
       role: 'UX Designer',
-      content: 'Amazing platform! The community support and detailed analytics kept me motivated throughout my journey.',
+      content: 'Amazing platform! The expert community and detailed analytics kept me motivated throughout my journey.',
       avatar: 'ER',
       rating: 5
     }
@@ -96,14 +98,14 @@ export const Home: React.FC = () => {
     {
       step: '01',
       title: 'Take Assessment',
-      description: 'Complete our smart quiz to discover your strengths and interests',
-      icon: Brain
+      description: 'Complete our comprehensive career quizzes and personality tests',
+      icon: FileText
     },
     {
       step: '02',
       title: 'Get Recommendations',
       description: 'Receive personalized career suggestions based on your results',
-      icon: Lightbulb
+      icon: Compass
     },
     {
       step: '03',
@@ -161,8 +163,8 @@ export const Home: React.FC = () => {
 
             {/* Subtitle */}
             <p className="max-w-4xl mx-auto mb-8 text-xl leading-relaxed text-gray-600 md:text-2xl dark:text-gray-400">
-              Discover your perfect career path with our AI-powered assessment platform. 
-              Get personalized recommendations, learning resources, and community support to transform your professional life.
+              Discover your perfect career path with our comprehensive assessment platform. 
+              Get personalized recommendations, learning resources, and expert guidance to transform your professional life.
             </p>
 
             {/* CTA Buttons */}
@@ -184,7 +186,7 @@ export const Home: React.FC = () => {
                   <Link to="/register">
                     <Button size="lg" className="px-12 py-6 text-lg transition-all duration-300 border-0 shadow-2xl rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 hover:shadow-3xl">
                       <Rocket className="mr-3" size={24} />
-                      Start Free Assessment
+                      Start Career Assessment
                     </Button>
                   </Link>
                   <Link to="/about">
@@ -258,8 +260,8 @@ export const Home: React.FC = () => {
               Smart Career Discovery
             </h2>
             <p className="max-w-3xl mx-auto text-xl text-gray-600 dark:text-gray-400">
-              Our platform combines cutting-edge AI with human expertise to guide you 
-              toward careers that match your unique strengths and passions.
+              Our platform combines proven assessment methods with expert career guidance to help you 
+              find careers that match your unique strengths and passions.
             </p>
           </motion.div>
 
@@ -474,7 +476,7 @@ export const Home: React.FC = () => {
               Ready to Transform Your Career?
             </h2>
             <p className="max-w-2xl mx-auto mb-8 text-xl leading-relaxed text-blue-100">
-              Join thousands of successful career changers who found their path with our intelligent platform. 
+              Join thousands of successful career changers who found their path with our assessment platform. 
               Your dream career is just a few clicks away.
             </p>
             {!user && (

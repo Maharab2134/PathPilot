@@ -106,6 +106,19 @@ export const ManageCareerInfo: React.FC = () => {
     e.preventDefault();
     
     try {
+      // Basic client-side validation to avoid server 400s
+      if (!formData.categoryId) {
+        alert('Please select a category for this career path.');
+        return;
+      }
+      if (!formData.title.trim()) {
+        alert('Please enter a career title.');
+        return;
+      }
+      if (!formData.description.trim()) {
+        alert('Please enter a career description.');
+        return;
+      }
       if (editingCareer) {
         await careerService.update(editingCareer._id, formData);
       } else {
@@ -115,7 +128,10 @@ export const ManageCareerInfo: React.FC = () => {
       resetForm();
       loadData();
     } catch (error) {
+      // Try to show server-side error message when available
       console.error('Error saving career info:', error);
+      const serverMessage = (error as any)?.response?.data?.message || (error as any)?.message;
+      alert('Failed to save career info: ' + serverMessage);
     }
   };
 
@@ -514,14 +530,18 @@ export const ManageCareerInfo: React.FC = () => {
                         <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                           Minimum Score (%) *
                         </label>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={formData.minScore}
-                          onChange={(e) => setFormData(prev => ({ ...prev, minScore: parseInt(e.target.value) }))}
-                          required
-                        />
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={Number.isFinite(formData.minScore) ? formData.minScore : 0}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              const parsed = v === '' ? 0 : parseInt(v, 10);
+                              setFormData(prev => ({ ...prev, minScore: Number.isNaN(parsed) ? 0 : parsed }));
+                            }}
+                            required
+                          />
                       </div>
                     </div>
 
