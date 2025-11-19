@@ -119,7 +119,7 @@ export const Categories: React.FC = () => {
                       </Link>
                     )}
                     
-                    <Link to={`/leaderboard?category=${category._id}`}>
+                    <Link to={`/leaderboard?category=${category._id}`} className='block'>
                       <Button variant="outline" className="w-full">
                         <Users className="mr-2" size={16} />
                         View Leaderboard
