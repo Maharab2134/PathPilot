@@ -1,6 +1,9 @@
 import { Types } from 'mongoose';
 import Question from '../models/Question';
 import Attempt, { IAttempt } from '../models/Attempt';
+// emit socket events on new attempts
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { getIo } = require('../socket');
 import CareerInfo from '../models/CareerInfo';
 
 export class QuizService {
@@ -59,7 +62,25 @@ export class QuizService {
       detail,
     });
 
-    return attempt.save();
+    const saved = await attempt.save();
+    try {
+      // Notify connected admin dashboards / listeners about the new attempt
+      getIo().emit('attempt:created', {
+        _id: saved._id,
+        userId: saved.userId,
+        categoryId: saved.categoryId,
+        score: saved.score,
+        total: saved.total,
+        percentage: saved.percentage,
+        createdAt: saved.createdAt,
+      });
+    } catch (err) {
+      // If socket isn't initialized or emit fails, don't break the flow
+      // eslint-disable-next-line no-console
+      console.warn('Failed to emit attempt:created', err?.message || err);
+    }
+
+    return saved;
   }
 
   static async getCareerRecommendation(

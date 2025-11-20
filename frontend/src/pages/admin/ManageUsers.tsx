@@ -28,15 +28,29 @@ import getSocket from '@/services/socket';
 export const ManageUsers: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [counts, setCounts] = useState({
+    totalUsers: 0,
+    activeUsers: 0,
+    admins: 0,
+    inactive: 0,
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [sortBy, setSortBy] = useState<'name' | 'email' | 'createdAt'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [exportLoading, setExportLoading] = useState(false);
 
   useEffect(() => {
     loadUsers();
+    loadCounts();
   }, []);
+
+  // Reload users when role filter or search changes
+  useEffect(() => {
+    const t = setTimeout(() => loadUsers(), 300);
+    return () => clearTimeout(t);
+  }, [selectedRole, searchTerm]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -56,20 +70,105 @@ export const ManageUsers: React.FC = () => {
   const loadUsers = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/admin/users?page=1&limit=50');
+      // Build query params based on filters
+      const params: any = { page: 1, limit: 50 };
+      if (selectedRole && selectedRole !== 'all') params.role = selectedRole;
+      if (searchTerm && searchTerm.trim().length > 0) params.q = searchTerm.trim();
+
+      const res = await api.get('/admin/users', { params });
       const data = res.data?.data;
-      // Mock additional user data for demo
-      const mockUsers = (data?.users || []).map((user: User, index: number) => ({
+
+      // Ensure minimal fields exist for UI (status, createdAt)
+      const serverUsers = (data?.users || []).map((user: User, index: number) => ({
         ...user,
-        status: index % 5 === 0 ? 'inactive' : 'active',
-        createdAt: new Date(Date.now() - Math.random() * 90 * 24 * 60 * 60 * 1000).toISOString(),
-        lastLogin: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
+        status: (user as any).status || (index % 5 === 0 ? 'inactive' : 'active'),
+        createdAt: user.createdAt || new Date(Date.now() - Math.random() * 90 * 24 * 60 * 60 * 1000).toISOString(),
+        lastLogin: (user as any).lastLogin || new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
       }));
-      setUsers(mockUsers);
+
+      setUsers(serverUsers);
     } catch (err) {
       console.error('Failed to load users', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCounts = async () => {
+    try {
+      // Fetch totals in parallel
+      const [usersRes, adminsRes, activeRes, inactiveRes] = await Promise.all([
+        api.get('/admin/users', { params: { page: 1, limit: 1, role: 'user' } }),
+        api.get('/admin/users', { params: { page: 1, limit: 1, role: 'admin' } }),
+        api.get('/admin/users', { params: { page: 1, limit: 1, status: 'active' } }),
+        api.get('/admin/users', { params: { page: 1, limit: 1, status: 'inactive' } }),
+      ]);
+
+      const totalUsers = usersRes.data?.data?.pagination?.total ?? 0;
+      const admins = adminsRes.data?.data?.pagination?.total ?? 0;
+      const activeUsers = activeRes.data?.data?.pagination?.total ?? 0;
+      const inactive = inactiveRes.data?.data?.pagination?.total ?? 0;
+
+      setCounts({ totalUsers, activeUsers, admins, inactive });
+    } catch (err) {
+      console.error('Failed to load user counts', err);
+    }
+  };
+
+  // Export users to CSV (uses current filters)
+  const handleExport = async () => {
+    setExportLoading(true);
+    try {
+      const params: any = { page: 1, limit: 10000 };
+      if (selectedRole && selectedRole !== 'all') params.role = selectedRole;
+      if (selectedStatus && selectedStatus !== 'all') params.status = selectedStatus;
+      if (searchTerm && searchTerm.trim().length > 0) params.q = searchTerm.trim();
+
+      const res = await api.get('/admin/users', { params });
+      const usersData: User[] = res.data?.data?.users || [];
+
+      if (usersData.length === 0) {
+        alert('No users to export');
+        return;
+      }
+
+      // Build CSV
+      const headers = ['Name', 'Email', 'Role', 'Status', 'Joined', 'Last Login'];
+      const escape = (v: any) => {
+        if (v === null || v === undefined) return '';
+        const s = String(v);
+        if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+          return '"' + s.replace(/"/g, '""') + '"';
+        }
+        return s;
+      };
+
+      const rows = usersData.map(u => [
+        escape(u.name),
+        escape(u.email),
+        escape(u.role),
+        escape((u as any).status || ''),
+        escape(u.createdAt || ''),
+        escape((u as any).lastLogin || ''),
+      ]);
+
+      const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const now = new Date().toISOString().slice(0,19).replace(/[:T]/g, '-');
+      a.download = `pathpilot-users-${now}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export failed', err);
+      alert('Export failed');
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -149,6 +248,8 @@ export const ManageUsers: React.FC = () => {
     try {
       await api.delete(`/admin/users/${id}`);
       setUsers(prev => prev.filter(u => (u._id || u.id) !== id));
+      // refresh totals after mutation
+      loadCounts();
     } catch (err: any) {
       console.error('Failed to delete user', err);
       alert(err?.response?.data?.message || 'Delete failed');
@@ -163,6 +264,8 @@ export const ManageUsers: React.FC = () => {
       await api.patch(`/admin/users/${id}`, { status: newStatus });
       // update local state optimistically
       setUsers(prev => prev.map(u => ((u._id || u.id) === id ? { ...u, status: newStatus } : u)));
+      // refresh totals after mutation
+      loadCounts();
     } catch (err: any) {
       console.error('Failed to update user status', err);
       alert(err?.response?.data?.message || 'Failed to update status');
@@ -211,9 +314,9 @@ export const ManageUsers: React.FC = () => {
             </p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" className="gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => handleExport()} disabled={exportLoading}>
               <Download size={18} />
-              Export
+              {exportLoading ? 'Exporting...' : 'Export'}
             </Button>
             <Button className="gap-2 border-0 shadow-lg bg-gradient-to-r from-blue-600 to-blue-700">
               <UserPlus size={18} />
@@ -224,11 +327,11 @@ export const ManageUsers: React.FC = () => {
 
         {/* Stats Overview */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {[
-            { label: 'Total Users', value: users.length, color: 'from-blue-500 to-blue-600', icon: Users },
-            { label: 'Active Users', value: users.filter(u => u.status === 'active').length, color: 'from-green-500 to-green-600', icon: UserCheck },
-            { label: 'Admins', value: users.filter(u => u.role === 'admin').length, color: 'from-purple-500 to-purple-600', icon: Shield },
-            { label: 'Inactive', value: users.filter(u => u.status === 'inactive').length, color: 'from-red-500 to-red-600', icon: UserX },
+            {[
+            { label: 'Total Users', value: counts.totalUsers, color: 'from-blue-500 to-blue-600', icon: Users },
+            { label: 'Active Users', value: counts.activeUsers || users.filter(u => u.status === 'active').length, color: 'from-green-500 to-green-600', icon: UserCheck },
+            { label: 'Admins', value: counts.admins, color: 'from-purple-500 to-purple-600', icon: Shield },
+            { label: 'Inactive', value: counts.inactive || users.filter(u => u.status === 'inactive').length, color: 'from-red-500 to-red-600', icon: UserX },
           ].map((stat, index) => {
             const Icon = stat.icon;
             return (

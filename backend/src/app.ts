@@ -32,8 +32,36 @@ app.use(
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
+  // Skip global limiter for auth routes so authLimiter can control auth traffic
+  skip: (req: any) => {
+    try {
+      const full = req.originalUrl || '';
+      if (typeof full === 'string' && full.startsWith('/api/auth')) return true;
+    } catch (e) {
+      // ignore
+    }
+    return false;
+  },
 });
 app.use('/api/', limiter);
+
+// Auth-specific limiter: tighter control for login endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // allow 20 requests per IP per window for auth routes
+  message:
+    'Too many authentication attempts from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  // During local development, skip limiting localhost to avoid blocking dev workflows
+  skip: (req: any) => {
+    if (process.env.NODE_ENV === 'development') {
+      const ip = req.ip || req.connection?.remoteAddress;
+      return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+    }
+    return false;
+  },
+});
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -61,7 +89,7 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/quiz', quizRoutes);
 app.use('/api/career', careerRoutes);

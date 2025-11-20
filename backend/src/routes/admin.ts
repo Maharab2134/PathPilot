@@ -3,6 +3,7 @@ import { body } from 'express-validator';
 import { authenticate, authorize } from '../middleware/auth';
 import { AuthRequest } from '../middleware/auth';
 import Question from '../models/Question';
+import Attempt from '../models/Attempt';
 import User from '../models/User';
 import { handleValidationErrors } from '../middleware/validation';
 
@@ -190,13 +191,22 @@ router.get('/users', authenticate, authorize('admin'), async (req, res) => {
     const limit = parseInt(req.query.limit as string) || 10;
     const skip = (page - 1) * limit;
 
-    const users = await User.find()
+    // Allow optional filtering by role/status (e.g., ?role=user or ?status=active)
+    const filter: any = {};
+    if (req.query.role) {
+      filter.role = req.query.role;
+    }
+    if (req.query.status) {
+      filter.status = req.query.status;
+    }
+
+    const users = await User.find(filter)
       .select('-passwordHash')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
-    const total = await User.countDocuments();
+    const total = await User.countDocuments(filter);
 
     res.json({
       success: true,
@@ -214,6 +224,44 @@ router.get('/users', authenticate, authorize('admin'), async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching users',
+      error: error.message,
+    });
+  }
+});
+
+// Attempts listing (admin) - provide counts for dashboard
+router.get('/attempts', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
+
+    const attempts = await Attempt.find()
+      .populate('categoryId', 'name')
+      .populate('userId', 'name email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .select('-detail');
+
+    const total = await Attempt.countDocuments();
+
+    res.json({
+      success: true,
+      data: {
+        attempts,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching attempts',
       error: error.message,
     });
   }

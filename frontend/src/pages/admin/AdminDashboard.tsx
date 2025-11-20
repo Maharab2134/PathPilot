@@ -39,13 +39,15 @@ export const AdminDashboard: React.FC = () => {
     activeCategories: 0
   });
   const [loading, setLoading] = useState(true);
+  const [recentAttempts, setRecentAttempts] = useState<Array<any>>([]);
 
   const loadStats = async () => {
     try {
       setLoading(true);
 
       // users total (admin endpoint returns pagination.total)
-      const usersRes = await api.get('/admin/users?page=1&limit=1');
+      // Request only regular users (exclude admin accounts)
+      const usersRes = await api.get('/admin/users?page=1&limit=1&role=user');
       const usersTotal = usersRes.data?.data?.pagination?.total ?? 0;
 
       // questions total (admin endpoint returns pagination.total)
@@ -57,15 +59,19 @@ export const AdminDashboard: React.FC = () => {
       const categoriesList = categoriesRes.data?.data?.categories || [];
       const activeCategories = categoriesList.length;
 
-      // Attempts: no admin endpoint available, leave as 0 for now
-      const totalAttempts = 0;
+      // Attempts: fetch admin attempts count and recent attempts
+      const attemptsRes = await api.get('/admin/attempts?page=1&limit=1');
+      const attemptsTotal = attemptsRes.data?.data?.pagination?.total ?? 0;
+      const recentRes = await api.get('/admin/attempts?page=1&limit=5');
+      const recent = recentRes.data?.data?.attempts || [];
 
       setStats({
         totalUsers: usersTotal,
         totalQuestions: questionsTotal,
-        totalAttempts,
+        totalAttempts: attemptsTotal,
         activeCategories,
       });
+      setRecentAttempts(recent);
     } catch (err) {
       console.error('Failed to load dashboard stats', err);
     } finally {
@@ -89,11 +95,36 @@ export const AdminDashboard: React.FC = () => {
     ];
 
     refreshEvents.forEach(event => socket.on(event, () => loadStats()));
+    // listen for new attempts and update recent activity + counts
+    const onAttempt = (attempt: any) => {
+      // prepend
+      setRecentAttempts(prev => [attempt, ...prev].slice(0, 10));
+      setStats((s) => ({ ...s, totalAttempts: (s.totalAttempts || 0) + 1 }));
+    };
+    socket.on('attempt:created', onAttempt);
 
     return () => {
       refreshEvents.forEach(event => socket.off(event));
+      socket.off('attempt:created', onAttempt);
     };
   }, []);
+
+  // Simple sparkline generator from recentAttempts (counts per minute)
+  const buildSparklinePoints = () => {
+    const now = Date.now();
+    const buckets: number[] = [];
+    const minutes = 6;
+    for (let i = minutes - 1; i >= 0; i--) {
+      const start = now - i * 60_000;
+      const end = start + 60_000;
+      const count = recentAttempts.filter((a) => {
+        const t = new Date(a.createdAt).getTime();
+        return t >= start && t < end;
+      }).length;
+      buckets.push(count);
+    }
+    return buckets;
+  };
 
   const statCards = [
     {
@@ -388,53 +419,35 @@ export const AdminDashboard: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {[
-                      { 
-                        action: 'New user registered', 
-                        time: '2 minutes ago',
-                        user: 'john.doe@example.com',
-                        icon: Users,
-                        iconColor: 'text-green-500'
-                      },
-                      { 
-                        action: 'Quiz completed in Programming', 
-                        time: '5 minutes ago',
-                        user: 'sarah.connor',
-                        icon: Trophy,
-                        iconColor: 'text-blue-500'
-                      },
-                      { 
-                        action: 'New question added to AI category', 
-                        time: '1 hour ago',
-                        user: 'Admin User',
-                        icon: BookOpen,
-                        iconColor: 'text-purple-500'
-                      },
-                      { 
-                        action: 'Career recommendation viewed', 
-                        time: '2 hours ago',
-                        user: 'mike.johnson',
-                        icon: TrendingUp,
-                        iconColor: 'text-orange-500'
-                      }
-                    ].map((activity, index) => {
-                      const Icon = activity.icon;
+                    {recentAttempts.length === 0 && (
+                      <div className="py-6 text-center text-gray-500">No recent activity</div>
+                    )}
+                    {recentAttempts.map((attempt, index) => {
+                      // userId/categoryId may be populated objects (e.g. mongoose populate)
+                      // ensure we render a string label instead of the full object
+                      const userLabel = attempt.userId && typeof attempt.userId === 'object'
+                        ? (attempt.userId.name || attempt.userId.email || attempt.userId._id)
+                        : (attempt.userId || '—');
+                      const categoryLabel = attempt.categoryId && typeof attempt.categoryId === 'object'
+                        ? (attempt.categoryId.name || attempt.categoryId.title || attempt.categoryId._id)
+                        : (attempt.categoryId || '—');
+
                       return (
-                        <div key={index} className="flex items-center gap-4 p-3 transition-colors rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                          <div className={`p-2 rounded-full bg-gray-100 dark:bg-gray-700 ${activity.iconColor}`}>
-                            <Icon size={16} />
+                        <div key={attempt._id || index} className="flex items-center gap-4 p-3 transition-colors rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                          <div className={`p-2 rounded-full bg-gray-100 dark:bg-gray-700 text-blue-600`}>
+                            <Trophy size={16} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-gray-900 dark:text-white">
-                              {activity.action}
+                              Quiz attempt — {attempt.percentage}%
                             </p>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
-                              by {activity.user}
+                              User: {userLabel} • Category: {categoryLabel}
                             </p>
                           </div>
                           <div className="text-right">
                             <p className="text-sm font-medium text-gray-900 dark:text-white">
-                              {activity.time}
+                              {attempt.createdAt ? new Date(attempt.createdAt).toLocaleTimeString() : '—'}
                             </p>
                             <p className="text-xs text-gray-500 dark:text-gray-400">
                               <Clock size={12} className="inline mr-1" />
